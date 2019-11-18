@@ -12,10 +12,10 @@ import os
 def loadDataset(PATH):
     labels = os.listdir(PATH)
     print(labels)
-
-#Create x and y
-
-#One hot encoding
+    #Convert digits to ascii
+    #Multiply and add
+    #Create x and y
+    #One hot encode
 
 #Create model
 

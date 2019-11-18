@@ -17,19 +17,12 @@ with open(path + "plates.csv", 'w') as plates_file:
     csvwriter = csv.writer(plates_file)
 
     for i in range(0, 16):
-
-        # Pick two random letters
         plate_alpha = ""
-        #for c1 in ascii_uppercase:
-        for j in [0]:
-            c1 = "A"
+        for c1 in ascii_uppercase:
             for c2 in ascii_uppercase:
                 plate_alpha = c1 + c2
-                for num in range(0,1):
-    
-
-                    # Pick two random numbers
-                    plate_num = "{:02d}".format(num)
+                for plate_num in range(0,99):
+                    plate_num = str(plate_num)
 
                     # Save plate to file
                     csvwriter.writerow([plate_alpha+plate_num])
@@ -40,14 +33,6 @@ with open(path + "plates.csv", 'w') as plates_file:
                                 plate_alpha + " " + plate_num, (45, 360),
                                 cv2.FONT_HERSHEY_PLAIN, 11, (255, 0, 0), 7, cv2.LINE_AA)
 
-                    # Create QR code image
-                    spot_name = "P" + str(i)
-                    qr = pyqrcode.create(spot_name+"_" + plate_alpha + plate_num)
-                    qrname = path + "QRCode_" + str(i) + ".png"
-                    qr.png(qrname, scale=20)
-                    QR_img = cv2.imread(qrname)
-                    QR_img = cv2.resize(QR_img, (600, 600), interpolation=cv2.INTER_AREA)
-
                     # Create parking spot label
                     s = "P" + str(i)
                     parking_spot = 255 * np.ones(shape=[600, 600, 3], dtype=np.uint8)
@@ -56,12 +41,9 @@ with open(path + "plates.csv", 'w') as plates_file:
                     spot_w_plate = np.concatenate((parking_spot, blank_plate), axis=0)
 
                     # Merge labelled or unlabelled images and save
-                    labelled = np.concatenate((QR_img, spot_w_plate), axis=0)
                     unlabelled = np.concatenate((255 * np.ones(shape=[600, 600, 3],
                                                 dtype=np.uint8), spot_w_plate), axis=0)
-                    cv2.imwrite(os.path.join(path + texture_path + "labelled/",
-                                            "plate_" + str(i) + ".png"), labelled)
                     cv2.imwrite(os.path.join(path+texture_path+"unlabelled/",
-                                            "plate_" + str(i) + ".png"), unlabelled)
+                                            "plate_" + str(i) + c1 + c2 + plate_num +".png"), unlabelled)
 
                     # Randomly create distorted images and save

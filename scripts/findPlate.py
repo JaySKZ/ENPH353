@@ -98,10 +98,17 @@ def perspectiveShift(image, coordinates):
     image_shifted = cv2.warpPerspective(image, M, (300,300))
     return image_shifted
 
+def findLetters(raw_image):
+    image = raw_image.copy()
+    image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    contours, _ = cv2.findContours(image_gray, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    print(contours)
+
 
 
 
 if __name__ == "__main__":
     raw_image = cv2.imread(PATH)
     coordinates = findCorners(raw_image)
-    perspectiveShift(raw_image, coordinates)
+    image = perspectiveShift(raw_image, coordinates)
+    findLetters(image)

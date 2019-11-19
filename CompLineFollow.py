@@ -17,7 +17,7 @@ from cv_bridge import CvBridge, CvBridgeError
 separation = 400 
 
 # State (need to figure out how to change this)
-stage = 3
+stage = 2
 
 # last error (need this somewhere outside loop)
 last_cX = 900
@@ -68,7 +68,7 @@ class image_converter:
             contours = sorted(contours, key=cv2.contourArea, reverse=True)[:1]
 
             M = cv2.moments(contours[0])
-
+            
             # Centroid
             cX = int(M['m10']/M['m00'])
             cY = int(M['m01']/M['m00'])
@@ -79,25 +79,18 @@ class image_converter:
         # Outer ring, go anti-clockwise, track right curb
         elif (stage == 2):
             # Set region of interest to right of screen
-            roi = dilated_mask[h-300:h, 750:w]
+            roi = dilated_mask[h-100:h, 750:w]
 
-            # Find the different contours
-            im2, contours, hierarchy = cv2.findContours(dilated_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            
-            # Sort by area (keep only the biggest one), which should theoretically be the curb 
-            contours = sorted(contours, key=cv2.contourArea, reverse=True)[:1]
+            M = cv2.moments(roi)
 
-            if len(contours) > 0:
-                M = cv2.moments(contours[0])
-
+            if (M['m00'] != 0):
                 # Centroid
                 cX = int(M['m10']/M['m00'])
                 cY = int(M['m01']/M['m00'])
+            else:
+                cX = 400
 
-            if (cX >= 1000):
-                error = abs((cX - w/2)) - separation
-            elif (cX < 1000):
-                error = abs((w/2 - cX)) - separation
+            error = cX - separation
 
 
         # Inner ring, go clockwise, track left curb
@@ -125,10 +118,10 @@ class image_converter:
 
         velocity = Twist()
 
-        if (abs(error) < 150):
+        if (abs(error) < 50):
             velocity.angular.z = 0
             velocity.linear.x = 0.2
-        elif (error >= 150):
+        elif (error >= 50):
             velocity.linear.x = 0
             if (stage == 2):
                 velocity.angular.z = -0.1
@@ -144,8 +137,8 @@ class image_converter:
         self.vel_pub.publish(velocity)
 
         print(cX)
-        cv2.circle(dilated_mask, (int(cX), h-100), 20, (0, 0, 255), -1)
-        cv2.imshow("Robot Camera", dilated_mask)
+        cv2.circle(roi, (int(cX), h-100), 20, (0, 0, 255), -1)
+        cv2.imshow("Robot Camera", roi)
         cv2.waitKey(1)
 
 def main(args):

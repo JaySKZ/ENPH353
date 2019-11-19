@@ -14,6 +14,7 @@ def findCorners(raw_image):
     count = 0
 
     #Convert to back of car to white and everything else to black
+    #TODO Replace with a mask
     for i in range(0,900,1):
         for j in range(0,900,1):
             if (image[i,j,0] == 102) and (image[i,j,1] == 102) and (image[i,j,2] == 102):
@@ -39,6 +40,7 @@ def findCorners(raw_image):
     contours, _ = cv2.findContours(img_gray, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     #Find two largest contours -> should be back of car
+    #TODO find a function that does this better
     largest_area = 0
     second_largest_area = 0
     second_bottom_y = 0
@@ -99,12 +101,12 @@ def perspectiveShift(image, coordinates):
     return image_shifted
 
 def findLetters(raw_image):
-    image = raw_image.copy()
-    image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    contours, _ = cv2.findContours(image_gray, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    print(contours)
+    parking_spot = raw_image[50:200, :]
+    license1 = raw_image[200:300,0:150]
+    license2 = raw_image[200:300,150:300]
+    return parking_spot, license1, license2 
 
-
+    
 
 
 if __name__ == "__main__":

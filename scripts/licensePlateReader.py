@@ -27,5 +27,5 @@ if __name__ == "__main__":
 
 
 
-    print((model.predict(i1)))
+    print(np.argmax(model.predict(i1)))
 

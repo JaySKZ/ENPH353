@@ -13,7 +13,7 @@ from PIL import Image, ImageFont, ImageDraw
 
 path = os.path.dirname(os.path.realpath(__file__)) + "/"
 texture_path = '../media/materials/textures/'
-iterations = 100
+iterations = 200
 
 with open(path + "plates.csv", 'w') as plates_file:
     csvwriter = csv.writer(plates_file)
@@ -62,6 +62,7 @@ with open(path + "plates.csv", 'w') as plates_file:
             # Merge labelled or unlabelled images and save
             unlabelled = np.concatenate((255 * np.ones(shape=[600, 600, 3],
                                         dtype=np.uint8), spot_w_plate), axis=0)
+
 
             cv2.imwrite(os.path.join(path+texture_path+"dataset/",
                                     str(i+1) + plate_alpha + plate_num + ".png"), unlabelled)

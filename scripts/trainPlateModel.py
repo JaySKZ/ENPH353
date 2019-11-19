@@ -6,6 +6,7 @@ from collections import Counter
 from matplotlib import pyplot as plt
 from PIL import Image
 import os
+import random
 import pickle
 
 from keras import layers
@@ -35,7 +36,7 @@ def loadDataset(PATH):
         image = cv2.imread(PATH+labels[i])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        dataset[3*i,0] = cv2.resize(image[750:1050, :], (64,64))
+        dataset[3*i,0] = cv2.resize(image[650:1150, :], (64,64))
         if ord(labels[i][0]) > 58:
             dataset[3*i,1] = (ord('P')-55)*36 + ord(labels[i][0]) - 55
         else:
@@ -52,8 +53,7 @@ def loadDataset(PATH):
             b = ord(labels[i][2]) - 55
         else:
             b = ord(labels[i][2]) - 48
-        dataset[3*i+1,1] = a*36 + b
-
+        dataset[3*i+1,1] = (a*36) + b
 
         dataset[3*i+2,0] = cv2.resize(image[1250:1550, 300:600], (64, 64))
         if ord(labels[i][3]) > 58:
@@ -65,7 +65,7 @@ def loadDataset(PATH):
             b = ord(labels[i][4]) - 55
         else:
             b = ord(labels[i][4]) - 48
-        dataset[3*i+2,1] = a * 36 + b
+        dataset[3*i+2,1] = (a*36) + b
 
     print("Loaded {} images from folder".format(len(labels)))
 
@@ -75,6 +75,21 @@ def loadDataset(PATH):
     # Split data into x and y data
     X_dataset_orig = np.array([data[0] for data in dataset[:]])
     Y_dataset_orig = np.array([[data[1]] for data in dataset]).T
+
+    #Dirty some data for a more robust CNN
+    for data in X_dataset_orig:
+        #Rotate
+        rows,cols = data.shape
+        M = cv2.getRotationMatrix2D((cols/2,rows/2),5*random.randint(-2,2),1)
+        data = cv2.warpAffine(data, M,(cols,rows))
+        #Warp perspective
+        pts1 = np.float32([[0+random.randint(0,5), 0+random.randint(0,0)], [64-random.randint(0,5), 0+random.randint(0,5)], 
+                            [0, 64-random.randint(0,10)], [64-random.randint(0,10), 64]])
+        pts2 = np.float32([[0, 0], [64, 0], [0, 64], [64, 64]])
+        M = cv2.getPerspectiveTransform(pts1, pts2) 
+        data = cv2.warpPerspective(data, M , (64,64))
+        #Blur
+        data = cv2.blur(data, (5,5))
         
     # Normalize X (images) dataset
     X_dataset = X_dataset_orig/255.
@@ -145,5 +160,5 @@ def reset_weights(model):
 
 if __name__ == "__main__":
     x,y = loadDataset("/home/fizzer/enph353_ws/src/enph353/enph353_gazebo/media/materials/textures/dataset/")
-    model = trainModel(x,y)
-    pickle.dump({model}, open('model.p','wb'))
+    #model = trainModel(x,y)
+    #pickle.dump({model}, open('model.p','wb'))

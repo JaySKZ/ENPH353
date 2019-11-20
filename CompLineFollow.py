@@ -19,7 +19,7 @@ class image_converter:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.callback)
         self.vel_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=30)
-        self.stage = 2
+        self.stage = 1
         self.separation = 400
         self.error = 0
         self.buffer = 50
@@ -67,6 +67,7 @@ class image_converter:
         red_dilated = cv2.dilate(red_eroded, kernel_dilate, iterations=1)
 
         bigRedM = cv2.moments(red_dilated)
+        frontRedM = cv2.moments(red_dilated[0:h:400, 0:w])
         redM = cv2.moments(red_dilated[h-100:h, 0:w])
 
         # Setup for motion detection
@@ -75,6 +76,7 @@ class image_converter:
         GBlur = cv2.GaussianBlur(gray, (21, 21), 0)
 
         if (self.stage == 2):
+            self.pedMove = False
             if (redM['m00'] != 0 and bigRedM['m00'] != 0):
                 self.crosswalk = True
                 self.pedMove = False
@@ -94,17 +96,20 @@ class image_converter:
                 frame_delta = cv2.absdiff(self.first_frame, self.next_frame)
                 thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
 
-                thresh = cv2.dilate(thresh, None, iterations = 2)
-                _, cnts, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                dilate = cv2.dilate(thresh, None, iterations = 2)
+                _, cnts, _ = cv2.findContours(dilate.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 for c in cnts:
 
                     # If the contour is too small, ignore it, otherwise, there's transient movement
-                    if cv2.contourArea(c) > 500:
+                    if cv2.contourArea(c) > 400:
                         self.pedMove = True
+                    else:
+                        self.pedMove = False
 
             elif (bigRedM['m00'] == 0):
                 self.crosswalk = False
+                self.error = 0
             
             
 
@@ -113,8 +118,8 @@ class image_converter:
         # Initial start
         if (self.stage == 1):
             # Set region of interest to left of screen
-            roi_center = dilated_mask[h-200:h, (w/2)-50:(w/2)+50]
-            roi_right = dilated_mask[h-100:h, 800:w]
+            roi_center = dilated_mask[h-205:h, (w/2)-50:(w/2)+50]
+            roi_right = dilated_mask[h-100:h, 850:w]
 
             M1 = cv2.moments(roi_center)
             M2 = cv2.moments(roi_right)
@@ -219,28 +224,32 @@ class image_converter:
 
         velocity = Twist()
 
-        # if (self.pedMove == False and self.crosswalk == False):
-        #     if (abs(self.error) < self.buffer):
-        #         velocity.angular.z = 0
-        #         velocity.linear.x = 0.2
-        #     elif (self.error >= self.buffer):
-        #         velocity.linear.x = 0
-        #         if (self.stage == 2 or self.stage == 4):
-        #             velocity.angular.z = -0.1
-        #         else:
-        #             velocity.angular.z = 0.1
-        #     else:
-        #         velocity.linear.x = 0
-        #         if (self.stage == 2 or self.stage == 4):
-        #             velocity.angular.z = 0.1
-        #         else:
-        #             velocity.angular.z = -0.1
-        # elif (self.pedMove == False and self.crosswalk == True):
-        #     velocity.angular.z = 0
-        #     velocity.linear.x = 0.2
-        # else:
-        #     velocity.angular.z = 0
-        #     velocity.linear.x = 0
+        if (self.crosswalk == False):
+            if (abs(self.error) < self.buffer):
+                velocity.angular.z = 0
+                velocity.linear.x = 0.2
+            elif (self.error >= self.buffer):
+                velocity.linear.x = 0
+                if (self.stage == 2 or self.stage == 4):
+                    velocity.angular.z = -0.1
+                else:
+                    velocity.angular.z = 0.1
+            else:
+                velocity.linear.x = 0
+                if (self.stage == 2 or self.stage == 4):
+                    velocity.angular.z = 0.1
+                else:
+                    velocity.angular.z = -0.1
+        elif (self.crosswalk == True):
+            velocity.angular.z = 0
+            velocity.linear.x = 0
+            print("crosswalk")
+            if (self.pedMove != True):
+                velocity.linear.x = 0.2
+            else:
+                velocity.linear.x = 0
+        else:
+            pass
 
         self.vel_pub.publish(velocity)
 
@@ -251,8 +260,8 @@ class image_converter:
         #print(self.stage)
         print(self.pedMove)
         #print(self.delay)
-        cv2.imshow("Motion", frame_delta)
-        #cv2.imshow("Actual", frame)
+        #cv2.imshow("Motion", dilate)
+        #cv2.imshow("Actual", frame)    
         # print(self.crosscount)
         # print(self.pedMove)
         # cv2.imshow("Robot Camera", red_dilated[h-100:h, (w/3):(2*w/3)])

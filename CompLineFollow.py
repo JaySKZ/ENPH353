@@ -13,21 +13,15 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 
-# Ideal distance from curb (in pixels)
-separation = 400 
-
-# State (need to figure out how to change this)
-stage = 2
-
-# last error (need this somewhere outside loop)
-last_cX = 900
-
 class image_converter:
 
     def __init__(self):
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.callback)
         self.vel_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=30)
+        self.stage = 1
+        self.separation = 400
+        self.error = 0
 
     def callback(self, data):
         try:
@@ -57,27 +51,27 @@ class image_converter:
         # This is enough image pre-processing, contour finding happens depending state machine
 
         # Initial start
-        if (stage == 1):
+        if (self.stage == 1):
             # Set region of interest to left of screen
-            roi = dilated_mask[h-100:h, 0:350]
+            roi_center = dilated_mask[h-200:h, (w/2)-50:(w/2)+50]
+            roi_right = dilated_mask[h-100:h, 700:w]
 
-            # Find the different contours
-            im2, contours, hierarchy = cv2.findContours(dilated_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            
-            # Sort by area (keep only the biggest one), which should theoretically be the curb 
-            contours = sorted(contours, key=cv2.contourArea, reverse=True)[:1]
+            M1 = cv2.moments(roi_center)
+            M2 = cv2.moments(roi_right)
 
-            M = cv2.moments(contours[0])
-            
-            # Centroid
-            cX = int(M['m10']/M['m00'])
-            cY = int(M['m01']/M['m00'])
+            if (M1['m00'] == 0):
+                self.error = 0
 
-            error = abs((w/2 - cX)) - separation
+            elif (M1['m00'] != 0):
+                if (M2['m00'] == 0):
+                    self.error = 200
+
+                elif (M2['m00'] != 0):
+                    self.stage = 2
 
 
         # Outer ring, go anti-clockwise, track right curb
-        elif (stage == 2):
+        elif (self.stage == 2):
             # Set region of interest to right of screen
             roi = dilated_mask[h-100:h, 750:w]
 
@@ -90,55 +84,53 @@ class image_converter:
             else:
                 cX = 400
 
-            error = cX - separation
+            self.error = cX - self.separation
 
 
         # Inner ring, go clockwise, track left curb
-        elif (stage == 3):
-            # Set region of interest to left of screen
-            roi = dilated_mask[h-200:h, 750:w]
+        elif (self.stage == 3):
 
-            # Find the different contours
-            im2, contours, hierarchy = cv2.findContours(dilated_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            
-            # Sort by area (keep only the biggest one), which should theoretically be the curb 
-            contours = sorted(contours, key=cv2.contourArea, reverse=True)[:1]
+            self.separation = 420
 
-            if len(contours) > 0:
-                M = cv2.moments(contours[0])
+            # Set region of interest to right of screen
+            roi = dilated_mask[h-150:h, 750:w]
 
+            M = cv2.moments(roi)
+
+            if (M['m00'] != 0):
                 # Centroid
                 cX = int(M['m10']/M['m00'])
                 cY = int(M['m01']/M['m00'])
-            
-                if(abs(last_cX - cX) >= 400):
-                    cX = last_cX
+            else:
+                cX = 400
 
-            error = abs((w/2 - cX)) - separation 
+            self.error = cX - self.separation
+
 
         velocity = Twist()
 
-        if (abs(error) < 50):
+        if (abs(self.error) < 50):
             velocity.angular.z = 0
             velocity.linear.x = 0.2
-        elif (error >= 50):
+        elif (self.error >= 50):
             velocity.linear.x = 0
-            if (stage == 2):
+            if (self.stage == 2 or self.stage == 3):
                 velocity.angular.z = -0.1
             else:
                 velocity.angular.z = 0.1
         else:
             velocity.linear.x = 0
-            if (stage == 2):
+            if (self.stage == 2 or self.stage == 3):
                 velocity.angular.z = 0.1
             else:
                 velocity.angular.z = -0.1
 
         self.vel_pub.publish(velocity)
 
-        print(cX)
-        cv2.circle(roi, (int(cX), h-100), 20, (0, 0, 255), -1)
-        cv2.imshow("Robot Camera", roi)
+        #print(cX)
+        #cv2.circle(roi, (int(cX), h-100), 20, (0, 0, 255), -1)
+        #print(M1['m00'] != 0)
+        cv2.imshow("Robot Camera", frame)
         cv2.waitKey(1)
 
 def main(args):

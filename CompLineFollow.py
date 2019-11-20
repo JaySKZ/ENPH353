@@ -74,7 +74,7 @@ class image_converter:
         first_frame = None
         next_frame = None
 
-        if (redM['m00'] != 0 and bigRedM != 0):
+        if (redM['m00'] != 0 and bigRedM['m00'] != 0):
             self.crosswalk = True
 
             self.error = 0

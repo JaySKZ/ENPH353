@@ -94,7 +94,7 @@ def trainModel(X_dataset, Y_dataset):
 
 
     conv_model.compile(loss='categorical_crossentropy',
-                    optimizer=optimizers.Adam(lr=1e-4),
+                    optimizer=optimizers.Adam(lr=1e-3),
                     metrics=['acc'])
 
     conv_model.summary()
@@ -103,7 +103,7 @@ def trainModel(X_dataset, Y_dataset):
     (trainX, testX, trainY, testY) = train_test_split(X_dataset, Y_dataset,	test_size=VALIDATION_SPLIT)
     print(trainX.shape)
     print(testX.shape)
-    aug = ImageDataGenerator(rotation_range=20,	zoom_range=0.15, width_shift_range=0.2, height_shift_range=0.2, shear_range=0.15, horizontal_flip=True, fill_mode="nearest")    
+    aug = ImageDataGenerator(rotation_range=10,	zoom_range=0.07, width_shift_range=0.1, height_shift_range=0.1, shear_range=0.1, horizontal_flip=False, fill_mode="nearest")    
     
     # train the network
 

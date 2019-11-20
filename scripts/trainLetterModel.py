@@ -39,7 +39,11 @@ def loadDataset(PATH):
     #Read labels and create y value with unicode
     for i in range(len(labels)):
         image = cv2.imread(PATH + labels[i])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image = cv2.blur(image,(8,8))
+        lower_black = np.array([150, 150, 150])
+        upper_black = np.array([255, 255, 255])
+        image = cv2.inRange(image, lower_black, upper_black)
+        
 
         dataset[2*i,0] = cv2.resize(image[80:250,40:150], (64,64))
         dataset[2*i+1,0] = cv2.resize(image[80:250,150:260], (64,64))
@@ -94,16 +98,21 @@ def trainModel(X_dataset, Y_dataset):
 
 
     conv_model.compile(loss='categorical_crossentropy',
-                    optimizer=optimizers.Adam(lr=1e-4),
+                    optimizer=optimizers.Adam(lr=1e-3),
                     metrics=['acc'])
 
     conv_model.summary()
 
     #Augment data
     (trainX, testX, trainY, testY) = train_test_split(X_dataset, Y_dataset,	test_size=VALIDATION_SPLIT)
-    print(trainX.shape)
-    print(testX.shape)
-    aug = ImageDataGenerator(rotation_range=20,	zoom_range=0.15, width_shift_range=0.2, height_shift_range=0.2, shear_range=0.15, horizontal_flip=True, fill_mode="nearest")    
+  
+    aug = ImageDataGenerator(rotation_range=10,	zoom_range=0.07, width_shift_range=0.1, height_shift_range=0.1, shear_range=0.1, horizontal_flip=False, fill_mode="nearest")   
+
+    #for x,y in aug.flow(trainX, trainY):
+    #    for i in range(len(x)):
+    #        cv2.imshow('window', x[i])
+    #        print(y[i])
+    #        cv2.waitKey(0)
     
     # train the network
 

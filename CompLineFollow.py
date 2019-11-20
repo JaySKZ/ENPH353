@@ -19,7 +19,7 @@ class image_converter:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.callback)
         self.vel_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=30)
-        self.stage = 1
+        self.stage = 2
         self.separation = 400
         self.error = 0
         self.buffer = 50
@@ -28,6 +28,9 @@ class image_converter:
         self.crosscount = 0
         self.pedMove = False
         self.delay = 0
+        self.first_frame = None
+        self.next_frame = None
+        self.persistence = 10
 
     def callback(self, data):
         try:
@@ -64,47 +67,44 @@ class image_converter:
         red_dilated = cv2.dilate(red_eroded, kernel_dilate, iterations=1)
 
         bigRedM = cv2.moments(red_dilated)
-        redM = cv2.moments(red_dilated[h-100:h, (w/3):(2*w/3)])
+        redM = cv2.moments(red_dilated[h-100:h, 0:w])
 
         # Setup for motion detection
         scan = frame[0:h, 150:(w-150)]
         gray = cv2.cvtColor(scan, cv2.COLOR_BGR2GRAY)
         GBlur = cv2.GaussianBlur(gray, (21, 21), 0)
 
-        first_frame = None
-        next_frame = None
+        if (self.stage == 2):
+            if (redM['m00'] != 0 and bigRedM['m00'] != 0):
+                self.crosswalk = True
+                self.pedMove = False
 
-        if (redM['m00'] != 0 and bigRedM['m00'] != 0):
-            self.crosswalk = True
+                #self.error = 0
 
-            self.error = 0
+                if self.first_frame is None: 
+                    self.first_frame = GBlur
+                self.delay += 1
 
-            first_frame = GBlur
-            self.delay += 1
+                if (self.delay > 15):
+                    self.delay = 0
+                    self.first_frame = self.next_frame
+                
+                self.next_frame = GBlur
 
-            if (self.delay > 10):
-                self.delay = 0
-                first_frame = next_frame
-            
-            next_frame = GBlur
+                frame_delta = cv2.absdiff(self.first_frame, self.next_frame)
+                thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
 
-            frame_delta = cv2.absdiff(first_frame, next_frame)
-            thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
+                thresh = cv2.dilate(thresh, None, iterations = 2)
+                _, cnts, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            thresh = cv2.dilate(thresh, None, iterations = 2)
-            _, cnts, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                for c in cnts:
 
-            for c in cnts:
+                    # If the contour is too small, ignore it, otherwise, there's transient movement
+                    if cv2.contourArea(c) > 500:
+                        self.pedMove = True
 
-                # Save the coordinates of all found contours
-                (a, b, c, d) = cv2.boundingRect(c)
-
-                # If the contour is too small, ignore it, otherwise, there's transient
-                # movement
-                if cv2.contourArea(c) > 500:
-                    self.pedMove = True
-        elif (bigRedM['m00'] == 0):
-            self.crosswalk = False
+            elif (bigRedM['m00'] == 0):
+                self.crosswalk = False
             
             
 
@@ -219,22 +219,23 @@ class image_converter:
 
         velocity = Twist()
 
-        if (abs(self.error) < self.buffer):
-            velocity.angular.z = 0
-            velocity.linear.x = 0.2
-        elif (self.error >= self.buffer):
-            velocity.linear.x = 0
-            if (self.stage == 2 or self.stage == 4):
-                velocity.angular.z = -0.1
-            else:
-                velocity.angular.z = 0.1
-        else:
-            velocity.linear.x = 0
-            if (self.stage == 2 or self.stage == 4):
-                velocity.angular.z = 0.1
-            else:
-                velocity.angular.z = -0.1
-        # elif (self.crosswalk == True and self.pedMove != True):
+        # if (self.pedMove == False and self.crosswalk == False):
+        #     if (abs(self.error) < self.buffer):
+        #         velocity.angular.z = 0
+        #         velocity.linear.x = 0.2
+        #     elif (self.error >= self.buffer):
+        #         velocity.linear.x = 0
+        #         if (self.stage == 2 or self.stage == 4):
+        #             velocity.angular.z = -0.1
+        #         else:
+        #             velocity.angular.z = 0.1
+        #     else:
+        #         velocity.linear.x = 0
+        #         if (self.stage == 2 or self.stage == 4):
+        #             velocity.angular.z = 0.1
+        #         else:
+        #             velocity.angular.z = -0.1
+        # elif (self.pedMove == False and self.crosswalk == True):
         #     velocity.angular.z = 0
         #     velocity.linear.x = 0.2
         # else:
@@ -248,7 +249,10 @@ class image_converter:
         #cv2.circle(frame, (int(cX), h-100), 20, (0, 0, 255), -1)
         #print(M1['m00'] != 0)
         #print(self.stage)
-        print(self.crosswalk)
+        print(self.pedMove)
+        #print(self.delay)
+        cv2.imshow("Motion", frame_delta)
+        #cv2.imshow("Actual", frame)
         # print(self.crosscount)
         # print(self.pedMove)
         # cv2.imshow("Robot Camera", red_dilated[h-100:h, (w/3):(2*w/3)])

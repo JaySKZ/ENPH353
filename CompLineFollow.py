@@ -7,6 +7,7 @@ import sys
 import rospy
 import cv2
 import numpy as np 
+import time
 
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
@@ -22,7 +23,7 @@ class image_converter:
         self.stage = 1
         self.separation = 400
         self.error = 0
-        self.buffer = 50
+        self.buffer = 60
         self.transition_state = 1 
         self.crosswalk = False
         self.crosscount = 0
@@ -57,8 +58,10 @@ class image_converter:
         kernel_dilate = np.ones((6,6),np.uint8)
         dilated_mask = cv2.dilate(eroded_mask, kernel_dilate, iterations=1)
 
+        whiteM = cv2.moments(dilated_mask[h-200:h-100, (w/2)-50:(w/2)+50])
+
         # Detecting red for crosswalks
-        lower_red = np.array([0,50,50])
+        lower_red = np.array([0,120,120])
         upper_red = np.array([10,255,255])
 
         red_mask = cv2.inRange(hsv, lower_red, upper_red)
@@ -66,9 +69,9 @@ class image_converter:
         red_eroded = cv2.erode(red_mask, kernel_erode, iterations=1)
         red_dilated = cv2.dilate(red_eroded, kernel_dilate, iterations=1)
 
-        bigRedM = cv2.moments(red_dilated)
+        bigRedM = cv2.moments(red_dilated[0:h-150, 0:w])
         frontRedM = cv2.moments(red_dilated[0:h:400, 0:w])
-        redM = cv2.moments(red_dilated[h-100:h, 0:w])
+        redM = cv2.moments(red_dilated[h-50:h, 0:w])
 
         # Setup for motion detection
         scan = frame[0:h, 150:(w-150)]
@@ -77,14 +80,13 @@ class image_converter:
 
         if (self.stage == 2):
             self.pedMove = False
-            if (redM['m00'] != 0 and bigRedM['m00'] != 0):
+            if (redM['m00'] != 0 and whiteM['m00'] != 0):
                 self.crosswalk = True
                 self.pedMove = False
 
-                #self.error = 0
-
                 if self.first_frame is None: 
                     self.first_frame = GBlur
+                    
                 self.delay += 1
 
                 if (self.delay > 15):
@@ -100,26 +102,24 @@ class image_converter:
                 _, cnts, _ = cv2.findContours(dilate.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 for c in cnts:
-
                     # If the contour is too small, ignore it, otherwise, there's transient movement
-                    if cv2.contourArea(c) > 400:
+                    if cv2.contourArea(c) > 100:
                         self.pedMove = True
                     else:
                         self.pedMove = False
 
-            elif (bigRedM['m00'] == 0):
-                self.crosswalk = False
-                self.error = 0
-            
-            
+                if (self.pedMove == False):
+                    if (whiteM['m00'] == 0):
+                        self.crosswalk = False
+
 
         # This is enough image pre-processing, contour finding happens depending state machine
 
         # Initial start
         if (self.stage == 1):
             # Set region of interest to left of screen
-            roi_center = dilated_mask[h-205:h, (w/2)-50:(w/2)+50]
-            roi_right = dilated_mask[h-100:h, 850:w]
+            roi_center = dilated_mask[h-255:h, (w/2)-50:(w/2)+50]
+            roi_right = dilated_mask[h-300:h-100, 700:w]
 
             M1 = cv2.moments(roi_center)
             M2 = cv2.moments(roi_right)
@@ -136,7 +136,7 @@ class image_converter:
 
 
         # Outer ring, go anti-clockwise, track right curb
-        elif (self.stage == 2 and self.crosswalk == False):
+        elif (self.stage == 2 and bigRedM['m00'] == 0):
             # Set region of interest to right of screen
             roi = dilated_mask[h-100:h, 750:w]
 
@@ -264,7 +264,7 @@ class image_converter:
         #cv2.imshow("Actual", frame)    
         # print(self.crosscount)
         # print(self.pedMove)
-        # cv2.imshow("Robot Camera", red_dilated[h-100:h, (w/3):(2*w/3)])
+        cv2.imshow("Robot Camera", red_dilated)
         # cv2.imshow("Other Camera", red_dilated[200:h-300, (w/3):(2*w/3)])
         cv2.waitKey(1)
 

@@ -1,31 +1,62 @@
-
+from __future__ import print_function
 import findPlate
 import pickle
 import cv2
 import numpy as np
+import roslib
+#roslib.load_manifest('enph353_ros_lab')
+import sys
+import rospy
+import cv2
+import numpy as np 
+
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from geometry_msgs.msg import Twist
+from cv_bridge import CvBridge, CvBridgeError
 
 PATH = '/home/fizzer/Pictures/platetest_cropped.png'
-#Setup: load cnn from pickle
+
+class image_converter:
+    def __init__(self):
+        self.bridge = CvBridge()
+        self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.callback)
+        #self.vel_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=30)
+        self.numbermodel = pickle.load(open("numbermodel.p", "rb")).pop()
+
+    def callback(self, data):
+        try:
+            frame = self.bridge.imgmsg_to_cv2(data, "bgr8")
+        except CvBridgeError as e:
+            print(e)
+        cv2.imshow('frame',frame)
+        cv2.waitKey()
+
+        corners = findPlate.findCorners(frame)
+        if corners.size == 0:
+            print('nothing found boss')
+        else:
+
+          letters = findPlate.findLetters(corners)
+          testing_image = letters[4]
+          testing_image = np.expand_dims(testing_image, axis=0)
+          testing_image = np.expand_dims(testing_image, axis=3)
+          print("Predicted as a: {}".format(np.argmax(self.numbermodel.predict(testing_image))))
+        
+        
 
 
-#Main loop: continually read camera footage and send data to cnn. If results are unique then send to license server
 
-if __name__ == "__main__":
-    model = pickle.load(open("model.p", "rb")).pop()
-    raw_image = cv2.imread(PATH)
-    coordinates = findPlate.findCorners(raw_image)
-    image = findPlate.perspectiveShift(raw_image, coordinates)
-    i1, i2, i3 = findPlate.findLetters(image)
-    cv2.imshow("yeet", i1)
-    cv2.waitKey(0)
-    i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2GRAY)
-    i1 = cv2.resize(i1, (64,64))
-    i1 = np.expand_dims(i1,axis=2)
-    i1 = np.expand_dims(i1,axis=0)
-    
-    
+def main(args):
+  ic = image_converter()
+  rospy.init_node('image_converter', anonymous=True)
+  try:
+    rospy.spin()
+  except KeyboardInterrupt:
+    print("Shutting down")
+  cv2.destroyAllWindows()
 
+if __name__ == '__main__':
+    main(sys.argv)
 
-
-    print(np.argmax(model.predict(i1)))
 

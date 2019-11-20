@@ -1,68 +1,43 @@
 #!/usr/bin/env python
 
+import string
+import random
+from random import randint
 import cv2
-import csv
 import numpy as np
 import os
-import pyqrcode
-import random
-import string
-
-from random import randint
 from PIL import Image, ImageFont, ImageDraw
 
-path = os.path.dirname(os.path.realpath(__file__)) + "/"
-texture_path = '../media/materials/textures/'
-iterations = 200
+path = '/home/fizzer/enph353_ws/src/enph353/enph353_gazebo/media/materials/textures/'
 
-with open(path + "plates.csv", 'w') as plates_file:
-    csvwriter = csv.writer(plates_file)
+NUMBER_OF_PLATES = 500
 
-    for j in range(iterations):
-        for i in range(0, 9):
+for i in range(0, NUMBER_OF_PLATES):
 
-            # Pick two random letters
-            plate_alpha = ""
-            for _ in range(0, 2):
-                plate_alpha += (random.choice(string.ascii_uppercase+ string.digits))
+    # Pick two random letters
+    plate_alpha = ""
+    for _ in range(0, 2):
+        plate_alpha += (random.choice(string.ascii_uppercase))
 
-            # Pick two random numbers
-            plate_num = ""
-            plate_num += (random.choice(string.ascii_uppercase+ string.digits))
-            plate_num += (random.choice(string.ascii_uppercase+ string.digits))
+    # Pick two random numbers
+    num = randint(0, 99)
+    plate_num = "{:02d}".format(num)
 
-            # Save plate to file
-            csvwriter.writerow([plate_alpha+plate_num])
+    # Write plate to image
+    blank_plate = cv2.imread(path+'blank_plate.png')
 
-            # Write plate to image
-            blank_plate = cv2.imread(path+'blank_plate.png')
+    # Convert into a PIL image (this is so we can use the monospaced fonts)
+    blank_plate_pil = Image.fromarray(blank_plate)
 
-            # To use monospaced font for the license plate we need to use the PIL
-            # package.
-            # Convert into a PIL image (this is so we can use the monospaced fonts)
-            blank_plate_pil = Image.fromarray(blank_plate)
-            # Get a drawing context
-            draw = ImageDraw.Draw(blank_plate_pil)
-            monospace = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", 200)
-            draw.text((48, 105),plate_alpha + " " + plate_num, (255,0,0), font=monospace)
-            # Convert back to OpenCV image and save
-            blank_plate = np.array(blank_plate_pil)
+    # Get a drawing context
+    draw = ImageDraw.Draw(blank_plate_pil)
+    monospace = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", 200)
+    draw.text((48, 50),plate_alpha + " " + plate_num, (255,0,0), font=monospace)
 
-            # cv2.putText(blank_plate,
-            #             plate_alpha + " " + plate_num, (45, 360),
-            #             cv2.FONT_HERSHEY_PLAIN, 11, (255, 0, 0), 7, cv2.LINE_AA)
+    # Convert back to OpenCV image and save
+    blank_plate = np.array(blank_plate_pil)
 
-            # Create parking spot label
-            s = "P" + str(i+1)
-            parking_spot = 255 * np.ones(shape=[600, 600, 3], dtype=np.uint8)
-            cv2.putText(parking_spot, s, (30, 450), cv2.FONT_HERSHEY_PLAIN, 28,
-                        (0, 0, 0), 30, cv2.LINE_AA)
-            spot_w_plate = np.concatenate((parking_spot, blank_plate), axis=0)
-
-            # Merge labelled or unlabelled images and save
-            unlabelled = np.concatenate((255 * np.ones(shape=[600, 600, 3],
-                                        dtype=np.uint8), spot_w_plate), axis=0)
-
-
-            cv2.imwrite(os.path.join(path+texture_path+"dataset/",
-                                    str(i+1) + plate_alpha + plate_num + ".png"), unlabelled)
+    # Write license plate to file
+    cv2.imwrite(os.path.join(path + "dataset/", 
+                                "plate_{}{}.png".format(plate_alpha, plate_num)),
+                blank_plate)

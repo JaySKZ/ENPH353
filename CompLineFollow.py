@@ -137,6 +137,7 @@ class image_converter:
 
         # Outer ring, go anti-clockwise, track right curb
         elif (self.stage == 2 and bigRedM['m00'] == 0):
+            self.separation = 395
             # Set region of interest to right of screen
             roi = dilated_mask[h-100:h, 750:w]
 
@@ -248,8 +249,7 @@ class image_converter:
                 velocity.linear.x = 0.2
             else:
                 velocity.linear.x = 0
-        else:
-            pass
+                time.sleep(0.5)
 
         self.vel_pub.publish(velocity)
 

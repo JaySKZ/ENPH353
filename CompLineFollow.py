@@ -80,9 +80,11 @@ class image_converter:
 
         if (self.stage == 2):
             self.pedMove = False
-            if (redM['m00'] != 0 and whiteM['m00'] != 0):
+            if (redM['m00'] != 0):
                 self.crosswalk = True
                 self.pedMove = False
+                print(redM['m00'] != 0)
+                print("crosswalk")
 
                 if self.first_frame is None: 
                     self.first_frame = GBlur
@@ -107,10 +109,8 @@ class image_converter:
                         self.pedMove = True
                     else:
                         self.pedMove = False
-
-                if (self.pedMove == False):
-                    if (whiteM['m00'] == 0):
-                        self.crosswalk = False
+            elif (bigRedM['m00'] == 0 and whiteM['m00']):
+                self.crosswalk = False
 
 
         # This is enough image pre-processing, contour finding happens depending state machine
@@ -119,7 +119,7 @@ class image_converter:
         if (self.stage == 1):
             # Set region of interest to left of screen
             roi_center = dilated_mask[h-255:h, (w/2)-50:(w/2)+50]
-            roi_right = dilated_mask[h-300:h-100, 700:w]
+            roi_right = dilated_mask[h-75:h, 750:w]
 
             M1 = cv2.moments(roi_center)
             M2 = cv2.moments(roi_right)
@@ -259,6 +259,7 @@ class image_converter:
         #print(M1['m00'] != 0)
         #print(self.stage)
         print(self.pedMove)
+        print(self.stage)
         #print(self.delay)
         #cv2.imshow("Motion", dilate)
         #cv2.imshow("Actual", frame)    

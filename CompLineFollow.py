@@ -31,7 +31,8 @@ class image_converter:
         self.delay = 0
         self.first_frame = None
         self.next_frame = None
-        self.persistence = 10
+        self.positive = 0
+        self.negative = 0
 
     def callback(self, data):
         try:
@@ -71,7 +72,7 @@ class image_converter:
 
         bigRedM = cv2.moments(red_dilated[0:h-150, 0:w])
         frontRedM = cv2.moments(red_dilated[0:h:400, 0:w])
-        redM = cv2.moments(red_dilated[h-50:h, 0:w])
+        redM = cv2.moments(red_dilated[h-70:h, 0:w])
 
         # Setup for motion detection
         scan = frame[0:h, 150:(w-150)]
@@ -79,19 +80,23 @@ class image_converter:
         GBlur = cv2.GaussianBlur(gray, (21, 21), 0)
 
         if (self.stage == 2):
+
             self.pedMove = False
+            self.positive = 0
+            self.negative = 0
+
             if (redM['m00'] != 0):
                 self.crosswalk = True
                 self.pedMove = False
-                print(redM['m00'] != 0)
-                print("crosswalk")
+                #print(redM['m00'] != 0)
+                #print("crosswalk")
 
                 if self.first_frame is None: 
                     self.first_frame = GBlur
                     
                 self.delay += 1
 
-                if (self.delay > 15):
+                if (self.delay > 1):
                     self.delay = 0
                     self.first_frame = self.next_frame
                 
@@ -105,11 +110,14 @@ class image_converter:
 
                 for c in cnts:
                     # If the contour is too small, ignore it, otherwise, there's transient movement
-                    if cv2.contourArea(c) > 100:
+                    if cv2.contourArea(c) > 10:
                         self.pedMove = True
                     else:
-                        self.pedMove = False
-            elif (bigRedM['m00'] == 0 and whiteM['m00']):
+                        self.negative += 1
+                        if (self.negative >= 3):
+                            self.pedMove = False
+                
+            elif (bigRedM['m00'] == 0 and whiteM['m00'] == 0):
                 self.crosswalk = False
 
 
@@ -244,7 +252,7 @@ class image_converter:
         elif (self.crosswalk == True):
             velocity.angular.z = 0
             velocity.linear.x = 0
-            print("crosswalk")
+            #print("stop")
             if (self.pedMove != True):
                 velocity.linear.x = 0.2
             else:
@@ -259,13 +267,13 @@ class image_converter:
         #print(M1['m00'] != 0)
         #print(self.stage)
         print(self.pedMove)
-        print(self.stage)
+        #print(self.stage)
         #print(self.delay)
         #cv2.imshow("Motion", dilate)
         #cv2.imshow("Actual", frame)    
         # print(self.crosscount)
         # print(self.pedMove)
-        cv2.imshow("Robot Camera", red_dilated)
+        #cv2.imshow("Robot Camera", red_dilated)
         # cv2.imshow("Other Camera", red_dilated[200:h-300, (w/3):(2*w/3)])
         cv2.waitKey(1)
 

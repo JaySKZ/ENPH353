@@ -20,7 +20,7 @@ class image_converter:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.callback)
         self.vel_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=30)
-        self.stage = 4
+        self.stage = 1
         self.separation = 400
         self.error = 0
         self.buffer = 60
@@ -33,6 +33,7 @@ class image_converter:
         self.next_frame = None
         self.positive = 0
         self.negative = 0
+        self.plates = 6
 
     def callback(self, data):
         try:
@@ -114,7 +115,7 @@ class image_converter:
                         self.pedMove = True
                     else:
                         self.negative += 1
-                        if (self.negative >= 5):
+                        if (self.negative >= 2):
                             self.pedMove = False
                 
             if (bigRedM['m00'] == 0 and whiteM['m00'] == 0):
@@ -146,8 +147,9 @@ class image_converter:
         # Outer ring, go anti-clockwise, track right curb
         elif (self.stage == 2 and bigRedM['m00'] == 0):
             self.separation = 400
+
             # Set region of interest to right of screen
-            roi = dilated_mask[h-100:h, 750:w]
+            roi = dilated_mask[h-100:h, 730:w]
 
             M = cv2.moments(roi)
 
@@ -156,59 +158,38 @@ class image_converter:
                 cX = int(M['m10']/M['m00'])
                 cY = int(M['m01']/M['m00'])
             else:
-                cX = -1000
+                cX = 400
 
             self.error = cX - self.separation
 
         # Transitioning to inner ring
         elif (self.stage == 3):
             # Set region of interest to the left of screen
-            roi_left = dilated_mask[h-100:h, 0:520]
-            roi_center = dilated_mask[h-60:h, (w/2)-50:(w/2)+50]
-            roi_right = dilated_mask[h-300:h, 750:w]
+            roi_left = dilated_mask[h-100:h, 0:500]
+            roi_center = dilated_mask[h-75:h, (w/2)-50:(w/2)+50]
+            roi_right = dilated_mask[h-100:h, 750:w]
 
             M1 = cv2.moments(roi_left)
             M2 = cv2.moments(roi_center)
             M3 = cv2.moments(roi_right)
 
-            self.separation = 400
-            self.buffer = 50
+            self.separation = 250
+            self.buffer = 100
 
-            if (self.transition_state == 1):
-                if (M1['m00'] != 0):
-                    if (M2['m00'] == 0 and M3['m00'] != 0):
-                        # Centroid of left line
-                        cX = int(M1['m10']/M1['m00'])
+            if (M1['m00'] != 0):
+                cX = int(M1['m10']/M1['m00'])
+                self.error = self.separation - cX
+            else:
+                self.error = 0
+            # elif (M1['m00'] == 0):
+            #     if (M2['m00'] == 0):
+            #         self.error = 0
 
-                        # Follow left curb
-                        self.error = self.separation - cX
-                    elif (M2['m00'] == 0 and M3['m00'] == 0):
-                        self.transition_state = 2
-                else:
-                    self.error = 200
-            
-            if (self.transition_state == 2):
-                if (M2['m00'] == 0):
-                    error = 0
-                    print("switching")
-                    if(M3['m00'] == 0):
-                        self.error = 200
-                        if ((int(M3['m10']/M3['m00']) - self.separation) <= 100):
-                            self.stage = 4
-                            print ("switched")
-
-            # elif (M1['m00'] == 0 and M2['m00'] == 0):
-            #     self.error = 0
-            #     print("2")
-
-            # elif (M2['m00'] != 0 and M3['m00'] == 0 and M1['m00'] == 0):
-            #     self.error = 200
-            #     print("3")
-            
-            # elif (M3['m00'] != 0 and M2['m00'] == 0):
-            #     self.stage = 4
-            #     print("4")
-
+            #     elif (M2['m00'] != 0):
+            #         if (M3['m00'] == 0):
+            #             self.error = 200
+            #         elif (M3['m00'] != 0):
+            #             self.stage = 4
 
         # Inner ring, go clockwise, track right
         elif (self.stage == 4):
@@ -249,8 +230,8 @@ class image_converter:
                 else:
                     velocity.angular.z = -0.1
         elif (self.crosswalk == True):
-            velocity.angular.z = 0
-            velocity.linear.x = 0
+            #velocity.angular.z = 0
+            #velocity.linear.x = 0
             if (self.pedMove != True):
                 velocity.linear.x = 0.2
             else:
@@ -269,7 +250,7 @@ class image_converter:
         #print(self.stage)
         #print(self.delay)
         #cv2.imshow("Motion", dilate)
-        #cv2.imshow("Actual", frame)    
+        cv2.imshow("Actual", frame)    
         # print(self.crosscount)
         # print(self.pedMove)
         #cv2.imshow("Robot Camera", red_dilated)

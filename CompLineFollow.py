@@ -62,7 +62,7 @@ class image_converter:
         whiteM = cv2.moments(dilated_mask[h-200:h-100, (w/2)-50:(w/2)+50])
 
         # Detecting red for crosswalks
-        lower_red = np.array([0,120,120])
+        lower_red = np.array([0,130,150])
         upper_red = np.array([10,255,255])
 
         red_mask = cv2.inRange(hsv, lower_red, upper_red)
@@ -82,21 +82,21 @@ class image_converter:
         if (self.stage == 2):
 
             self.pedMove = False
-            self.positive = 0
             self.negative = 0
 
             if (redM['m00'] != 0):
                 self.crosswalk = True
                 self.pedMove = False
                 #print(redM['m00'] != 0)
-                #print("crosswalk")
+                print("crosswalk")
 
+            if (self.crosswalk == True):
                 if self.first_frame is None: 
                     self.first_frame = GBlur
                     
                 self.delay += 1
 
-                if (self.delay > 1):
+                if (self.delay > 3):
                     self.delay = 0
                     self.first_frame = self.next_frame
                 
@@ -110,14 +110,14 @@ class image_converter:
 
                 for c in cnts:
                     # If the contour is too small, ignore it, otherwise, there's transient movement
-                    if cv2.contourArea(c) > 10:
+                    if cv2.contourArea(c) > 100:
                         self.pedMove = True
                     else:
                         self.negative += 1
-                        if (self.negative >= 3):
+                        if (self.negative >= 5):
                             self.pedMove = False
                 
-            elif (bigRedM['m00'] == 0 and whiteM['m00'] == 0):
+            if (bigRedM['m00'] == 0 and whiteM['m00'] == 0):
                 self.crosswalk = False
 
 
@@ -145,7 +145,7 @@ class image_converter:
 
         # Outer ring, go anti-clockwise, track right curb
         elif (self.stage == 2 and bigRedM['m00'] == 0):
-            self.separation = 395
+            self.separation = 400
             # Set region of interest to right of screen
             roi = dilated_mask[h-100:h, 750:w]
 
@@ -252,12 +252,11 @@ class image_converter:
         elif (self.crosswalk == True):
             velocity.angular.z = 0
             velocity.linear.x = 0
-            #print("stop")
             if (self.pedMove != True):
                 velocity.linear.x = 0.2
             else:
                 velocity.linear.x = 0
-                time.sleep(0.5)
+                #time.sleep(0.5)
 
         self.vel_pub.publish(velocity)
 
@@ -266,6 +265,7 @@ class image_converter:
         #cv2.circle(frame, (int(cX), h-100), 20, (0, 0, 255), -1)
         #print(M1['m00'] != 0)
         #print(self.stage)
+        #print(self.crosswalk)
         print(self.pedMove)
         #print(self.stage)
         #print(self.delay)

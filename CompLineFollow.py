@@ -156,7 +156,7 @@ class image_converter:
                 cX = int(M['m10']/M['m00'])
                 cY = int(M['m01']/M['m00'])
             else:
-                cX = 400
+                cX = -1000
 
             self.error = cX - self.separation
 

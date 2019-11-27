@@ -20,7 +20,7 @@ class image_converter:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.callback)
         self.vel_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=30)
-        self.stage = 3
+        self.stage = 1
         self.separation = 400
         self.error = 0
         self.buffer = 60
@@ -61,7 +61,7 @@ class image_converter:
         kernel_dilate = np.ones((6,6),np.uint8)
         dilated_mask = cv2.dilate(eroded_mask, kernel_dilate, iterations=1)
 
-        whiteM = cv2.moments(dilated_mask[h-150:h-80, (w/2)-50:(w/2)+50])
+        whiteM = cv2.moments(dilated_mask[h-250:h-80, (w/2)-50:(w/2)+50])
 
         # Detecting red for crosswalks
         lower_red = np.array([0,130,150])
@@ -74,7 +74,7 @@ class image_converter:
 
         bigRedM = cv2.moments(red_dilated[0:h-150, 0:w])
         frontRedM = cv2.moments(red_dilated[0:h:400, 0:w])
-        redM = cv2.moments(red_dilated[h-70:h, 0:w])
+        redM = cv2.moments(red_dilated[h-95:h, 0:w])
 
         # Setup for motion detection
         scan = frame[0:h, 150:(w-150)]
@@ -85,6 +85,10 @@ class image_converter:
         lower_black = np.array([0,0,0])
         upper_black = np.array([255,255,15])
 
+        # Blue of jeans
+        lower_blue = np.array([80, 100, 50])
+        upper_blue = np.array([255, 200, 150])
+
 
         # Pedestrian, crosswalk stuff
         if (self.stage == 2):
@@ -94,36 +98,48 @@ class image_converter:
 
             if ((redM['m00'] != 0 and whiteM['m00'] != 0) or (bigRedM['m00'] != 0 and whiteM['m00'] != 0)):
                 self.crosswalk = True
-                self.pedMove = False
+                #self.pedMove = False
                 #print(redM['m00'] != 0)
                 print("crosswalk")
 
             if (self.crosswalk == True):
-                if self.first_frame is None: 
-                    self.first_frame = GBlur
+                blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
+
+                blue_eroded = cv2.erode(blue_mask, kernel_erode, iterations=1)
+                blue_dilated = cv2.dilate(blue_eroded, kernel_dilate, iterations=1)
+
+                blue_roi = blue_dilated[(h-350):h, 400:880]
+
+                MBlue = cv2.moments(blue_roi)
+
+                if (MBlue['m00'] != 0):
+                    self.pedMove = True
+
+                # if self.first_frame is None: 
+                #     self.first_frame = GBlur
                     
-                self.delay += 1
+                # self.delay += 1
 
-                if (self.delay > 3):
-                    self.delay = 0
-                    self.first_frame = self.next_frame
+                # if (self.delay > 5):
+                #     self.delay = 0
+                #     self.first_frame = self.next_frame
                 
-                self.next_frame = GBlur
+                # self.next_frame = GBlur
 
-                frame_delta = cv2.absdiff(self.first_frame, self.next_frame)
-                thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
+                # frame_delta = cv2.absdiff(self.first_frame, self.next_frame)
+                # thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
 
-                dilate = cv2.dilate(thresh, None, iterations = 2)
-                _, cnts, _ = cv2.findContours(dilate.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                # dilate = cv2.dilate(thresh, None, iterations = 2)
+                # _, cnts, _ = cv2.findContours(dilate.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-                for c in cnts:
-                    # If the contour is too small, ignore it, otherwise, there's transient movement
-                    if cv2.contourArea(c) > 100:
-                        self.pedMove = True
-                    else:
-                        self.negative += 1
-                        if (self.negative >= 2):
-                            self.pedMove = False
+                # for c in cnts:
+                #     # If the contour is too small, ignore it, otherwise, there's transient movement
+                #     if cv2.contourArea(c) > 70:
+                #         self.pedMove = True
+                #     else:
+                #         self.negative += 1
+                #         if (self.negative >= 2):
+                #             self.pedMove = False
                 
             if (bigRedM['m00'] == 0 and whiteM['m00'] == 0):
                 self.crosswalk = False
@@ -169,7 +185,7 @@ class image_converter:
 
         # Outer ring, go anti-clockwise, track right curb
         elif (self.stage == 2 and bigRedM['m00'] == 0):
-            self.separation = 400
+            self.separation = 404
 
             # Set region of interest to right of screen
             roi = dilated_mask[h-100:h, 730:w]
@@ -257,7 +273,7 @@ class image_converter:
                 velocity.linear.x = 0.2
             else:
                 velocity.linear.x = 0
-                #time.sleep(0.5)
+                time.sleep(0.5)
         elif (self.seeTruck == True):
             velocity.linear.x = 0
             print("we in here")
@@ -270,12 +286,13 @@ class image_converter:
         #print(M1['m00'] != 0)
         #print(self.stage)
         #print(self.crosswalk)
-        #print(self.pedMove)
-        print(self.stage)
+        print(self.pedMove)
+        #print(self.stage)
         #print(self.delay)
         #cv2.imshow("Motion", dilate)
-        cv2.imshow("Actual", frame)   
-        cv2.imshow("Black", black_roi) 
+        #cv2.imshow("Actual", frame)   
+        #cv2.imshow("Blue", blue_roi)
+        #cv2.imshow("Black", black_roi) 
         # print(self.crosscount)
         # print(self.pedMove)
         #cv2.imshow("Robot Camera", red_dilated)

@@ -1,0 +1,24 @@
+11:57:09: Position 1: JN00
+11:57:09: Position 2: YB32
+11:57:09: Position 3: QF35
+11:57:09: Position 4: XU96
+11:57:09: Position 5: YD12
+11:57:09: Position 6: IN06
+11:57:09: Position 7: JO54
+11:57:09: Position 8: CS70
+11:58:11: Message received: TeamYESSIR,andrew,0,YE37
+11:58:19: Message received: TeamYESSIR,andrew,2,YB32
+11:58:19: Awarded: 6 pts
+11:58:19: Team total: 6 pts
+11:58:33: Message received: TeamYESSIR,andrew,2,YB32
+11:58:33: Awarded: 6 pts
+11:58:47: Message received: TeamYESSIR,andrew,3,QF35
+11:58:47: Awarded: 6 pts
+11:58:47: Team total: 12 pts
+11:59:25: Message received: TeamYESSIR,andrew,4,JA96
+11:59:25: Awarded: 0 pts
+11:59:37: Message received: TeamYESSIR,andrew,4,XU96
+11:59:37: Awarded: 6 pts
+11:59:37: Team total: 18 pts
+12:00:19: Full lap completed: +5 points
+12:00:19: Team total: 23 pts

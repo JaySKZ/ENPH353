@@ -10,7 +10,7 @@ from PIL import Image, ImageFont, ImageDraw
 
 path = '/home/fizzer/enph353_ws/src/enph353/enph353_gazebo/media/materials/textures/'
 
-NUMBER_OF_PLATES = 500
+NUMBER_OF_PLATES = 4000
 
 for i in range(0, NUMBER_OF_PLATES):
 

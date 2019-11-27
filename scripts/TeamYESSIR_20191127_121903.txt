@@ -1,0 +1,22 @@
+12:18:06: Position 1: JN00
+12:18:06: Position 2: YB32
+12:18:06: Position 3: QF35
+12:18:06: Position 4: XU96
+12:18:06: Position 5: YD12
+12:18:06: Position 6: IN06
+12:18:06: Position 7: JO54
+12:18:06: Position 8: CS70
+12:19:03: Message received: TeamYESSIR,andrew,0,YE37
+12:19:04: Message received: TeamYESSIR,andrew,a,aaaa
+12:19:04: Plate location is not a number.
+12:19:23: Message received: TeamYESSIR,andrew,3,QF35
+12:19:23: Awarded: 6 pts
+12:19:23: Team total: 6 pts
+12:20:11: Message received: TeamYESSIR,andrew,4,XU96
+12:20:11: Awarded: 6 pts
+12:20:11: Team total: 12 pts
+12:20:28: Message received: TeamYESSIR,andrew,5,YD12
+12:20:28: Awarded: 6 pts
+12:20:28: Team total: 18 pts
+12:20:44: Message received: TeamYESSIR,andrew,a,aaaa
+12:20:44: Plate location is not a number.

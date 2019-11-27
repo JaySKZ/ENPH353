@@ -21,9 +21,9 @@ from keras import backend
 
 NUMBER_OF_LABELS = 10
 CONFIDENCE_THRESHOLD = 0.01
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-5
 VALIDATION_SPLIT = 0.15
-BS = 60
+BS = 32
 EPOCHS = 30
 
 def convert_to_one_hot(Y, C):
@@ -39,26 +39,37 @@ def loadDataset(PATH):
     #Read labels and create y value with unicode
     for i in range(len(labels)):
         image = cv2.imread(PATH + labels[i])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        #image = cv2.blur(image,(8,8))
+        lower_black = np.array([150, 150, 150])
+        upper_black = np.array([255, 255, 255])
+        image = cv2.inRange(image, lower_black, upper_black)
 
-        dataset[2*i,0] = cv2.resize(image[80:250,340:450], (64,64))
-        dataset[2*i+1,0] = cv2.resize(image[80:250,450:560], (64,64))
+        dataset[2*i,0] = cv2.resize(image[75:255,345:455], (64,64))
+        dataset[2*i+1,0] = cv2.resize(image[75:255,450:550], (64,64))
         
-        dataset[2*i,1] = ord(labels[i][8]) - 48
-        dataset[2*i+1,1] = ord(labels[i][9]) - 48     
+        dataset[2*i,1] = ord((labels[i][8])) - 48
+        dataset[2*i+1,1] = ord(labels[i][9]) - 48
+
+        if(ord(labels[i][8])-48 == 0):
+            dataset[2*i,0] = cv2.circle(dataset[2*i,0], (30,30), 13, (255,255,255), -1)
+            
+        if(ord(labels[i][9])-48 == 0):
+            dataset[2*i+1,0] = cv2.circle(dataset[2*i+1,0], (30,30), 11, (255,255,255), -1)
 
 
     print("Loaded {} images from folder".format(len(labels)))
 
-    # Shuffle the dataset
-    np.random.shuffle(dataset)
+    #Randomly Augment Data
+    #for i in range(2*len(labels)):
+        #cv2.imshow('y',dataset[i,0])
+        #cv2.waitKey(0)
 
     # Split data into x and y data
     X_dataset_orig = np.array([data[0] for data in dataset[:]])
     Y_dataset_orig = np.array([[data[1]] for data in dataset]).T
 
     # Normalize X (images) dataset
-    X_dataset = X_dataset_orig/255.
+    X_dataset = X_dataset_orig
     X_dataset = np.expand_dims(X_dataset, axis=3)
 
     # Convert Y dataset to one-hot encoding
@@ -73,7 +84,6 @@ def loadDataset(PATH):
     print("Y shape: " + str(Y_dataset.shape))
 
 
-    X_dataset = np.stack(X_dataset)
     return X_dataset, Y_dataset
 
 def trainModel(X_dataset, Y_dataset):
@@ -94,23 +104,25 @@ def trainModel(X_dataset, Y_dataset):
 
 
     conv_model.compile(loss='categorical_crossentropy',
-                    optimizer=optimizers.Adam(lr=1e-3),
+                    optimizer=optimizers.Adam(lr=LEARNING_RATE),
                     metrics=['acc'])
 
     conv_model.summary()
 
     #Augment data
     (trainX, testX, trainY, testY) = train_test_split(X_dataset, Y_dataset,	test_size=VALIDATION_SPLIT)
-    print(trainX.shape)
-    print(testX.shape)
-    aug = ImageDataGenerator(rotation_range=10,	zoom_range=0.07, width_shift_range=0.1, height_shift_range=0.1, shear_range=0.1, horizontal_flip=False, fill_mode="nearest")    
-    
+    aug = ImageDataGenerator(horizontal_flip=False, shear_range=random.uniform(5,10), width_shift_range=4, height_shift_range=4)     
+    #for x,y in aug.flow(trainX, trainY):
+        #for i in range(len(x)):
+            #cv2.imshow('window', x[i])
+            #print(y[i])
+            #cv2.waitKey(0)
     # train the network
 
     print("[INFO] training network for {} epochs...".format(EPOCHS))
     history_conv = conv_model.fit_generator(
 	aug.flow(trainX, trainY, batch_size=BS),
-	validation_data=(testX, testY),
+	validation_data=(aug.flow(testX, testY, batch_size=BS)),
 	steps_per_epoch=len(trainX) // BS,
 	epochs=EPOCHS)
 
@@ -125,7 +137,7 @@ def trainModel(X_dataset, Y_dataset):
     plt.ylabel('loss')
     plt.xlabel('epoch')
     plt.legend(['train loss', 'val loss'], loc='upper left')
-    plt.show()
+    #plt.show()
 
     plt.plot(history_conv.history['acc'])
     plt.plot(history_conv.history['val_acc'])
@@ -133,7 +145,7 @@ def trainModel(X_dataset, Y_dataset):
     plt.ylabel('accuracy (%)')
     plt.xlabel('epoch')
     plt.legend(['train accuracy', 'val accuracy'], loc='upper left')
-    plt.show()
+    #plt.show()
 
     
 
@@ -151,4 +163,4 @@ def reset_weights(model):
 if __name__ == "__main__":
     x,y = loadDataset("/home/fizzer/enph353_ws/src/enph353/enph353_gazebo/media/materials/textures/dataset/")
     model = trainModel(x,y)
-    pickle.dump({model}, open('numbermodel.p','wb'))
+    model.save("numbermodel.h5")

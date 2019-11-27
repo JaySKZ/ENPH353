@@ -21,14 +21,14 @@ from keras import backend
 
 NUMBER_OF_LABELS = 26
 CONFIDENCE_THRESHOLD = 0.01
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-5
 VALIDATION_SPLIT = 0.15
-BS = 60
+BS = 32
 EPOCHS = 30
 
 def convert_to_one_hot(Y, C):
     Y = np.eye(C)[Y.reshape(-1)].T
-    return Y
+    return Y   
 
 #Load Dataset
 def loadDataset(PATH):
@@ -39,30 +39,36 @@ def loadDataset(PATH):
     #Read labels and create y value with unicode
     for i in range(len(labels)):
         image = cv2.imread(PATH + labels[i])
-        image = cv2.blur(image,(8,8))
         lower_black = np.array([150, 150, 150])
         upper_black = np.array([255, 255, 255])
         image = cv2.inRange(image, lower_black, upper_black)
         
-
-        dataset[2*i,0] = cv2.resize(image[80:250,40:150], (64,64))
-        dataset[2*i+1,0] = cv2.resize(image[80:250,150:260], (64,64))
+        #Accounts for Q's being much taller
+        if labels[i][6] != 'Q':
+            dataset[2*i,0] = cv2.resize(image[75:235,45:150], (64,64))
+        else:
+            dataset[2*i,0] = cv2.resize(image[75:255,45:150], (64,64))
+        if labels[i][7] != 'Q':
+            dataset[2*i+1,0] = cv2.resize(image[75:235,145:255], (64,64))
+        else:
+            dataset[2*i+1,0] = cv2.resize(image[75:255,145:255], (64,64))
                 
         dataset[2*i,1] = ord(labels[i][6]) - 65
-        dataset[2*i+1,1] = ord(labels[i][7]) - 65     
-
+        dataset[2*i+1,1] = ord(labels[i][7]) - 65   
         
     print("Loaded {} images from folder".format(len(labels)))
 
-    # Shuffle the dataset
-    np.random.shuffle(dataset)
+    #for i in range(2*len(labels)):
+        #cv2.imshow('y',dataset[i,0])
+        #cv2.waitKey(0)
+
 
     # Split data into x and y data
     X_dataset_orig = np.array([data[0] for data in dataset[:]])
     Y_dataset_orig = np.array([[data[1]] for data in dataset]).T
 
     # Normalize X (images) dataset
-    X_dataset = X_dataset_orig/255.
+    X_dataset = X_dataset_orig
     X_dataset = np.expand_dims(X_dataset, axis=3)
 
     # Convert Y dataset to one-hot encoding
@@ -77,13 +83,13 @@ def loadDataset(PATH):
     print("Y shape: " + str(Y_dataset.shape))
 
 
-    X_dataset = np.stack(X_dataset)
+    #X_dataset = np.stack(X_dataset)
     return X_dataset, Y_dataset
 
 def trainModel(X_dataset, Y_dataset):
     conv_model = models.Sequential()
     conv_model.add(layers.Conv2D(32, (3, 3), activation='relu',
-                                input_shape=(64, 64, 1)))
+                             input_shape=(64, 64, 1)))
     conv_model.add(layers.MaxPooling2D((2, 2)))
     conv_model.add(layers.Conv2D(64, (3, 3), activation='relu'))
     conv_model.add(layers.MaxPooling2D((2, 2)))
@@ -98,28 +104,27 @@ def trainModel(X_dataset, Y_dataset):
 
 
     conv_model.compile(loss='categorical_crossentropy',
-                    optimizer=optimizers.Adam(lr=1e-3),
-                    metrics=['acc'])
+                   optimizer=optimizers.RMSprop(lr=LEARNING_RATE),
+                   metrics=['acc'])
 
     conv_model.summary()
 
     #Augment data
     (trainX, testX, trainY, testY) = train_test_split(X_dataset, Y_dataset,	test_size=VALIDATION_SPLIT)
-  
-    aug = ImageDataGenerator(rotation_range=10,	zoom_range=0.07, width_shift_range=0.1, height_shift_range=0.1, shear_range=0.1, horizontal_flip=False, fill_mode="nearest")   
+    
+    aug = ImageDataGenerator(horizontal_flip=False, shear_range=random.uniform(5,10), width_shift_range=4, height_shift_range=4)      
 
     #for x,y in aug.flow(trainX, trainY):
     #    for i in range(len(x)):
     #        cv2.imshow('window', x[i])
     #        print(y[i])
     #        cv2.waitKey(0)
-    
     # train the network
 
     print("[INFO] training network for {} epochs...".format(EPOCHS))
     history_conv = conv_model.fit_generator(
 	aug.flow(trainX, trainY, batch_size=BS),
-	validation_data=(testX, testY),
+	validation_data=(aug.flow(testX, testY, batch_size=BS)),
 	steps_per_epoch=len(trainX) // BS,
 	epochs=EPOCHS)
 
@@ -134,7 +139,7 @@ def trainModel(X_dataset, Y_dataset):
     plt.ylabel('loss')
     plt.xlabel('epoch')
     plt.legend(['train loss', 'val loss'], loc='upper left')
-    plt.show()
+    #plt.show()
 
     plt.plot(history_conv.history['acc'])
     plt.plot(history_conv.history['val_acc'])
@@ -142,9 +147,19 @@ def trainModel(X_dataset, Y_dataset):
     plt.ylabel('accuracy (%)')
     plt.xlabel('epoch')
     plt.legend(['train accuracy', 'val accuracy'], loc='upper left')
-    plt.show()
+    #plt.show()
 
-    
+    y_pred = conv_model.predict(X_dataset)
+    y_pred = [np.argmax(i) for i in y_pred]
+    Y_dataset = [np.argmax(i) for i in Y_dataset]
+
+    confusion_matrix = sklearn.metrics.confusion_matrix(Y_dataset, y_pred)
+    confusion_matrix = confusion_matrix.astype("float") / confusion_matrix.sum(axis=1)[:, np.newaxis]
+
+    opt = np.get_printoptions()
+    np.set_printoptions(threshold=np.inf)
+    print(confusion_matrix)
+    np.set_printoptions(opt)
 
     return conv_model
 
@@ -160,4 +175,6 @@ def reset_weights(model):
 if __name__ == "__main__":
     x,y = loadDataset("/home/fizzer/enph353_ws/src/enph353/enph353_gazebo/media/materials/textures/dataset/")
     model = trainModel(x,y)
-    pickle.dump({model}, open('lettermodel.p','wb'))
+    model.save("lettermodel.h5")
+
+

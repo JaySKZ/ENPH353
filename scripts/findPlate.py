@@ -4,12 +4,11 @@ import cv2
 
 PATH = '/home/fizzer/test.png'
 contour_tolerance = 5 #Buffer for detecting contours so that tiny contours dont get registered
-MIN_AREA = 10 #Minimum area of the back of a car to be read by the license plate reader: Shoudl operate similar to a min distance
-MIN_WIDTH = 5
-MAX_WIDTH = 3000
-MIN_HEIGHT =10
-MAX_LETTER_AREA = 700
-MIN_LETTER_AREA = 10
+MIN_AREA = 18000
+MIN_WIDTH = 80
+MAX_WIDTH = 220
+MIN_HEIGHT = 110
+MIN_LETTER_AREA = 40
 
 #Returns a array of the four corners of the closest back of a parked car. 
 #If there is no car closer than the min area then it returns false
@@ -62,7 +61,7 @@ def findCorners(raw_image):
         return raw_image[top_y:int(bottom_y*1.1), left_x:right_x, :]
     else:
         return np.array([])
-
+        
 #Perspective shifts an image according to given coordinates
 def perspectiveShift(image, coordinates):
     pts2 = np.float32([[0, 0], [300, 0], [0, 300], [300, 300]])
@@ -73,9 +72,10 @@ def perspectiveShift(image, coordinates):
 def findLetters(raw_image):
     image = raw_image.copy()
 
+
     #Find license plate letters
     #Apply blue mask to image
-    lower_blue = np.array([100,100,30])
+    lower_blue = np.array([80,80,15])
     upper_blue = np.array([125,255,255])
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, lower_blue, upper_blue)
@@ -91,14 +91,14 @@ def findLetters(raw_image):
     plate = np.array([0,0,0,0], dtype=object)
     count = 0
     for i in range(len(contours)):
-        if (cv2.contourArea(contours[i]) < MAX_LETTER_AREA) and (cv2.contourArea(contours[i]) > MIN_LETTER_AREA) and (count < 4):
+        if (cv2.contourArea(contours[i]) > MIN_LETTER_AREA) and (count < 4):
             #cv2.drawContours(image, contours, i, (0,255,0), 3)
             flag =  False
             for j in range(len(contours)):
                 if i == j: break
                 x1,y1,w1,h1 = cv2.boundingRect(contours[i])
                 x2,y2,w2,h2 = cv2.boundingRect(contours[j])
-                if  ((x1 > x2) and (x1 + w1 < x2 + w2) and (y1 > y2) and (y1 + h1 < y2 + w2)):
+                if  (x1 > x2) and (x1 + w1 < x2 + w2):
                     flag = True
 
             if not flag:
@@ -119,7 +119,7 @@ def findLetters(raw_image):
     #Find parking spot number
     #Apply black mask
     lower_black = np.array([0, 0, 0])
-    upper_black = np.array([30, 30, 30])
+    upper_black = np.array([50, 50, 50])
     mask = cv2.inRange(image, lower_black, upper_black)
     res = cv2.bitwise_and(image, image, mask=mask)
 
@@ -130,8 +130,9 @@ def findLetters(raw_image):
     #Create bounding boxes
     parkingLabels = []
     for i in range(len(contours)):
-        digitBox =cv2.boundingRect(contours[i])
-        parkingLabels.append(digitBox)
+        if cv2.contourArea(contours[i]) > MIN_LETTER_AREA:
+            digitBox =cv2.boundingRect(contours[i])
+            parkingLabels.append(digitBox)
 
     #Find right most
     parkingLabels = sorted(parkingLabels, key=furthestRight, reverse=True)
@@ -146,7 +147,8 @@ def findLetters(raw_image):
     result = []
     for i in range(len(digitBoxs)):
         x,y,w,h = digitBoxs[i]
-        digit_image = image[max(y,0):min(y+h,image.shape[0]), max(x,0):min(x+w,image.shape[1]),:]
+
+        digit_image = image[max(y-3,0):min(y+h+3,image.shape[0]), max(x-2,0):min(x+w+3,image.shape[1]),:]
         digit_image = cv2.resize(digit_image, (64,64))
         if i == 4:
             mask = cv2.inRange(digit_image, lower_black, upper_black)
@@ -154,10 +156,12 @@ def findLetters(raw_image):
             hsv = cv2.cvtColor(digit_image, cv2.COLOR_BGR2HSV)
             mask = cv2.inRange(hsv, lower_blue, upper_blue)
         result.append(255-mask)
+        
 
     return result
     
 
+#Functions for sorting lists/arrays
 def contourArea(val):
     return cv2.contourArea(val)
 

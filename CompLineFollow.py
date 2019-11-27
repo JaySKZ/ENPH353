@@ -60,7 +60,7 @@ class image_converter:
         kernel_dilate = np.ones((6,6),np.uint8)
         dilated_mask = cv2.dilate(eroded_mask, kernel_dilate, iterations=1)
 
-        whiteM = cv2.moments(dilated_mask[h-200:h-100, (w/2)-50:(w/2)+50])
+        whiteM = cv2.moments(dilated_mask[h-150:h-80, (w/2)-50:(w/2)+50])
 
         # Detecting red for crosswalks
         lower_red = np.array([0,130,150])
@@ -85,7 +85,7 @@ class image_converter:
             self.pedMove = False
             self.negative = 0
 
-            if (redM['m00'] != 0):
+            if ((redM['m00'] != 0 and whiteM['m00'] != 0) or (bigRedM['m00'] != 0 and whiteM['m00'] != 0)):
                 self.crosswalk = True
                 self.pedMove = False
                 #print(redM['m00'] != 0)

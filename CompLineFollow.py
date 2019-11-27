@@ -20,7 +20,7 @@ class image_converter:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.callback)
         self.vel_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=30)
-        self.stage = 1
+        self.stage = 3
         self.separation = 400
         self.error = 0
         self.buffer = 60
@@ -34,6 +34,7 @@ class image_converter:
         self.positive = 0
         self.negative = 0
         self.plates = 6
+        self.seeTruck = False
 
     def callback(self, data):
         try:
@@ -80,6 +81,12 @@ class image_converter:
         gray = cv2.cvtColor(scan, cv2.COLOR_BGR2GRAY)
         GBlur = cv2.GaussianBlur(gray, (21, 21), 0)
 
+        # Detecting black for truck
+        lower_black = np.array([0,0,0])
+        upper_black = np.array([255,255,15])
+
+
+        # Pedestrian, crosswalk stuff
         if (self.stage == 2):
 
             self.pedMove = False
@@ -120,9 +127,25 @@ class image_converter:
                 
             if (bigRedM['m00'] == 0 and whiteM['m00'] == 0):
                 self.crosswalk = False
+ 
 
+        # Pickup truck detect
+        if (self.stage == 3 or self.stage == 4):
+            black_mask = cv2.inRange(hsv, lower_black, upper_black)
 
-        # This is enough image pre-processing, contour finding happens depending state machine
+            black_eroded = cv2.erode(black_mask, kernel_erode, iterations=1)
+            black_dilated = cv2.dilate(black_eroded, kernel_dilate, iterations=1)
+
+            black_roi = black_dilated[(h-250):h, 200:1080]
+
+            MBlack = cv2.moments(black_roi)
+
+            if (MBlack['m00'] != 0):
+                self.seeTruck = True
+                print("truck")
+            else:
+                self.seeTruck = False
+                print("safe")
 
         # Initial start
         if (self.stage == 1):
@@ -163,38 +186,36 @@ class image_converter:
             self.error = cX - self.separation
 
         # Transitioning to inner ring
-        elif (self.stage == 3):
+        elif ((self.stage == 3) and (self.seeTruck == False)):
             # Set region of interest to the left of screen
             roi_left = dilated_mask[h-100:h, 0:500]
-            roi_center = dilated_mask[h-75:h, (w/2)-50:(w/2)+50]
-            roi_right = dilated_mask[h-100:h, 750:w]
+            roi_center = dilated_mask[h-70:h, (w/2)-50:(w/2)+50]
+            roi_right = dilated_mask[h-120:h, 750:w]
 
             M1 = cv2.moments(roi_left)
             M2 = cv2.moments(roi_center)
             M3 = cv2.moments(roi_right)
 
-            self.separation = 250
-            self.buffer = 100
+            self.separation = 170
+            self.buffer = 150
 
             if (M1['m00'] != 0):
                 cX = int(M1['m10']/M1['m00'])
                 self.error = self.separation - cX
             else:
-                self.error = 0
-            # elif (M1['m00'] == 0):
-            #     if (M2['m00'] == 0):
-            #         self.error = 0
-
-            #     elif (M2['m00'] != 0):
-            #         if (M3['m00'] == 0):
-            #             self.error = 200
-            #         elif (M3['m00'] != 0):
-            #             self.stage = 4
+                if (M3['m00'] == 0 and M2['m00'] == 0):
+                    self.error = 0
+                elif(M2['m00'] != 0):
+                    self.error = 400
+                    if (M3['m00'] != 0):
+                        self.stage = 4
+                else:
+                    self.error = 400
 
         # Inner ring, go clockwise, track right
         elif (self.stage == 4):
             
-            self.separation = 400
+            self.separation = 420
             self.buffer = 50
 
             # Set region of interest to right of screen
@@ -207,13 +228,13 @@ class image_converter:
                 cX = int(M['m10']/M['m00'])
                 cY = int(M['m01']/M['m00'])
             else: 
-                cX = 400
+                cX = 800
 
             self.error = cX - self.separation
 
         velocity = Twist()
 
-        if (self.crosswalk == False):
+        if (self.crosswalk == False and self.seeTruck == False):
             if (abs(self.error) < self.buffer):
                 velocity.angular.z = 0
                 velocity.linear.x = 0.2
@@ -237,6 +258,9 @@ class image_converter:
             else:
                 velocity.linear.x = 0
                 #time.sleep(0.5)
+        elif (self.seeTruck == True):
+            velocity.linear.x = 0
+            print("we in here")
 
         self.vel_pub.publish(velocity)
 
@@ -246,11 +270,12 @@ class image_converter:
         #print(M1['m00'] != 0)
         #print(self.stage)
         #print(self.crosswalk)
-        print(self.pedMove)
-        #print(self.stage)
+        #print(self.pedMove)
+        print(self.stage)
         #print(self.delay)
         #cv2.imshow("Motion", dilate)
-        cv2.imshow("Actual", frame)    
+        cv2.imshow("Actual", frame)   
+        cv2.imshow("Black", black_roi) 
         # print(self.crosscount)
         # print(self.pedMove)
         #cv2.imshow("Robot Camera", red_dilated)

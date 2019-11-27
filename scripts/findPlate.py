@@ -4,11 +4,11 @@ import cv2
 
 PATH = '/home/fizzer/test.png'
 contour_tolerance = 5 #Buffer for detecting contours so that tiny contours dont get registered
-MIN_AREA = 18000
-MIN_WIDTH = 80
+MIN_AREA = 17000
+MIN_WIDTH = 70
 MAX_WIDTH = 220
-MIN_HEIGHT = 110
-MIN_LETTER_AREA = 40
+MIN_HEIGHT = 100
+MIN_LETTER_AREA = 35
 
 #Returns a array of the four corners of the closest back of a parked car. 
 #If there is no car closer than the min area then it returns false
@@ -51,8 +51,8 @@ def findCorners(raw_image):
             largest_area = area
             largest_contour = contour
 
-            right_x = maxx-10
-            left_x = minx+10
+            right_x = maxx-15
+            left_x = minx+15
             top_y = miny
             bottom_y = maxy
 

@@ -20,7 +20,7 @@ class image_converter:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.callback)
         self.vel_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=30)
-        self.stage = 1
+        self.stage = 4
         self.separation = 400
         self.error = 0
         self.buffer = 60
@@ -164,7 +164,7 @@ class image_converter:
         elif (self.stage == 3):
             # Set region of interest to the left of screen
             roi_left = dilated_mask[h-100:h, 0:520]
-            roi_center = dilated_mask[h-75:h, (w/2)-50:(w/2)+50]
+            roi_center = dilated_mask[h-60:h, (w/2)-50:(w/2)+50]
             roi_right = dilated_mask[h-300:h, 750:w]
 
             M1 = cv2.moments(roi_left)
@@ -177,7 +177,7 @@ class image_converter:
             if (self.transition_state == 1):
                 if (M1['m00'] != 0):
                     if (M2['m00'] == 0 and M3['m00'] != 0):
-                        # Centroid of left lineMIN_SIZE_FOR_MOVEMENT
+                        # Centroid of left line
                         cX = int(M1['m10']/M1['m00'])
 
                         # Follow left curb
@@ -188,7 +188,6 @@ class image_converter:
                     self.error = 200
             
             if (self.transition_state == 2):
-                roi_right = dilated_mask[h-300:h, 750:w]
                 if (M2['m00'] == 0):
                     error = 0
                     print("switching")
@@ -214,7 +213,7 @@ class image_converter:
         # Inner ring, go clockwise, track right
         elif (self.stage == 4):
             
-            self.separation = 420
+            self.separation = 400
             self.buffer = 50
 
             # Set region of interest to right of screen
@@ -226,7 +225,7 @@ class image_converter:
                 # Centroid
                 cX = int(M['m10']/M['m00'])
                 cY = int(M['m01']/M['m00'])
-            else:
+            else: 
                 cX = 400
 
             self.error = cX - self.separation
